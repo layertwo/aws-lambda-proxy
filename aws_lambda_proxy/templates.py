@@ -1,7 +1,7 @@
 """
-    lambda-proxy api documents.
+lambda-proxy api documents.
 
-    Freely adapted from https://github.com/tiangolo/fastapi/blob/master/fastapi/openapi/docs.py
+Freely adapted from https://github.com/tiangolo/fastapi/blob/master/fastapi/openapi/docs.py
 """
 
 

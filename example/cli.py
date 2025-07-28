@@ -1,12 +1,10 @@
 """Launch server"""
 
 import base64
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qsl, urlparse
 
 import click
-from urllib.parse import urlparse, parse_qsl
-
-from http.server import HTTPServer, BaseHTTPRequestHandler
-
 from handler import app
 
 

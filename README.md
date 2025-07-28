@@ -1,8 +1,8 @@
-# lambda-proxy
+# aws-lambda-proxy
 
-[![Packaging status](https://badge.fury.io/py/lambda-proxy.svg)](https://badge.fury.io/py/lambda-proxy)
-[![CircleCI](https://circleci.com/gh/vincentsarago/lambda-proxy.svg?style=svg)](https://circleci.com/gh/vincentsarago/lambda-proxy)
-[![codecov](https://codecov.io/gh/vincentsarago/lambda-proxy/branch/master/graph/badge.svg)](https://codecov.io/gh/vincentsarago/lambda-proxy)
+[![Packaging status](https://badge.fury.io/py/aws-lambda-proxy.svg)](https://badge.fury.io/py/aws-lambda-proxy)
+
+Forked from https://github.com/vincentsarago/lambda-proxy/
 
 A zero-requirement proxy linking AWS API Gateway `{proxy+}` requests and AWS Lambda.
 
@@ -12,14 +12,14 @@ A zero-requirement proxy linking AWS API Gateway `{proxy+}` requests and AWS Lam
 
 ```bash
 $ pip install -U pip
-$ pip install lambda-proxy
+$ pip install aws-lambda-proxy
 ```
 
 Or install from source:
 
 ```bash
-$ git clone https://github.com/vincentsarag/lambda-proxy.git
-$ cd lambda-proxy
+$ git clone https://github.com/layertwo/aws-lambda-proxy.git
+$ cd aws-lambda-proxy
 $ pip install -U pip
 $ pip install -e .
 ```
@@ -33,7 +33,7 @@ open an issue.
 With GET request
 
 ```python
-from lambda_proxy.proxy import API
+from aws_lambda_proxy import API
 
 APP = API(name="app")
 
@@ -45,7 +45,7 @@ def print_id(id):
 With POST request
 
 ```python
-from lambda_proxy.proxy import API
+from aws_lambda_proxy import API
 
 APP = API(name="app")
 
@@ -54,28 +54,10 @@ def print_id(id, body):
     return ('OK', 'plain/text', id)
 ```
 
-**Note**
-
-Starting in version 5.2.0, users can now add route using `@APP.get` and `@APP.post` removing the need to add `methods=[**]`
-
 ## Binary body
 
-Starting from version 5.0.0, lambda-proxy will decode base64 encoded body on POST message.
-
-Pre 5.0.0
 ```python
-from lambda_proxy.proxy import API
-
-APP = API(name="app")
-
-@APP.route('/test', methods=['POST']e)
-def print_id(body):
-    body = json.loads(base64.b64decode(body).decode())
-```
-
-Post 5.0.0
-```python
-from lambda_proxy.proxy import API
+from aws_lambda_proxy import API
 
 APP = API(name="app")
 
@@ -137,7 +119,7 @@ This app will work but the documentation will only show the second route because
 - **token**: set `access_token` validation
 - **payload_compression_method**: Enable and select an output body compression
 - **binary_b64encode**: base64 encode the output body (API Gateway)
-- **ttl**: Cache Control setting (Time to Live) **(Deprecated in 6.0.0)**
+- **ttl**: Cache Control setting (Time to Live) 
 - **cache_control**: Cache Control setting
 - **description**: route description (for documentation)
 - **tag**: list of tags (for documentation)
@@ -147,7 +129,7 @@ This app will work but the documentation will only show the second route because
 Add a Cache Control header with a Time to Live (TTL) in seconds.
 
 ```python
-from lambda_proxy.proxy import API
+from aws_lambda_proxy import API
 APP = API(app_name="app")
 
 @APP.get('/test/tests/<id>', cors=True, cache_control="public,max-age=3600")
@@ -162,7 +144,7 @@ Note: If function returns other then "OK", Cache-Control will be set to `no-cach
 When working with binary on API-Gateway we must return a base64 encoded string
 
 ```python
-from lambda_proxy.proxy import API
+from aws_lambda_proxy import API
 
 APP = API(name="app")
 
@@ -177,7 +159,7 @@ def print_id(filename):
 Enable compression if "Accept-Encoding" if found in headers.
 
 ```python
-from lambda_proxy.proxy import API
+from aws_lambda_proxy import API
 
 APP = API(name="app")
 
@@ -201,7 +183,7 @@ Lambda-proxy provide a simple token validation system.
    http://myurl/test/tests/myid?access_token=blabla)
 
 ```python
-from lambda_proxy.proxy import API
+from aws_lambda_proxy import API
 
 APP = API(name="app")
 
@@ -215,7 +197,7 @@ def print_id(id):
 QueryString parameters are passed as function's options.
 
 ```python
-from lambda_proxy.proxy import API
+from aws_lambda_proxy import API
 
 APP = API(name="app")
 
@@ -230,14 +212,14 @@ requests:
 $ curl /000001
    0001
 
-$ curl /000001?name=vincent
-   0001vincent
+$ curl /000001?name=layertwo
+   0001layertwo
 ```
 
 ## Multiple Routes
 
 ```python
-from lambda_proxy.proxy import API
+from aws_lambda_proxy import API
 APP = API(name="app")
 
 @APP.get('/<id>', cors=True)
@@ -252,11 +234,11 @@ requests:
 $ curl /000001
    0001--
 
-$ curl /000001?name=vincent
-   0001-vincent-
+$ curl /000001?name=layertwo
+   0001-layertwo-
 
-$ curl /000001/1?name=vincent
-   0001-vincent-1
+$ curl /000001/1?name=layertwo
+   0001-layertwo-1
 ```
 
 # Advanced features
@@ -266,7 +248,7 @@ $ curl /000001/1?name=vincent
 Pass event and context to the handler function.
 
 ```python
-from lambda_proxy.proxy import API
+from aws_lambda_proxy import API
 
 APP = API(name="app")
 
@@ -281,7 +263,7 @@ def print_id(ctx, evt, id):
 
 # Automatic OpenAPI documentation
 
-By default the APP (`lambda_proxy.proxy.API`) is provided with three (3) routes:
+By default the APP (`aws_lambda_proxy.API`) is provided with three (3) routes:
 - `/openapi.json`: print OpenAPI JSON definition
 
 - `/docs`: swagger html UI
@@ -292,10 +274,10 @@ By default the APP (`lambda_proxy.proxy.API`) is provided with three (3) routes:
 
 **Function annotations**
 
-To be able to render full and precise API documentation, lambda_proxy uses python type hint and annotations [link](https://www.python.org/dev/peps/pep-3107/).
+To be able to render full and precise API documentation, aws_lambda_proxy uses python type hint and annotations [link](https://www.python.org/dev/peps/pep-3107/).
 
 ```python
-from lambda_proxy.proxy import API
+from aws_lambda_proxy import API
 
 APP = API(name="app")
 
@@ -308,12 +290,10 @@ In the example above, our route `/test/<int:id>` define an input `id` to be a `I
 
 # Custom Domain and path mapping
 
-Since version 4.1.1, lambda-proxy support custom domain and path mapping (see https://github.com/vincentsarago/lambda-proxy/issues/16).
-
 Note: When using path mapping other than `root` (`/`), `/` route won't be available.
 
 ```python
-from lambda_proxy.proxy import API
+from aws_lambda_proxy import API
 
 api = API(name="api", debug=True)
 
@@ -338,15 +318,9 @@ def yo():
     return ("OK", "text/plain", "YOOOOO")
 ```
 
-# Plugin
-
-- Add cache layer: https://github.com/vincentsarago/lambda-proxy-cache
-
-
 # Examples
 
--  https://github.com/vincentsarago/lambda-proxy/tree/master/example
--  https://github.com/RemotePixel/remotepixel-tiler
+-  https://github.com/aws-lambda-proxy/tree/main/example
 
 
 # Contribution & Devellopement
@@ -356,34 +330,11 @@ Issues and pull requests are more than welcome.
 **Dev install & Pull-Request**
 
 ```bash
-$ git clone https://github.com/vincentsarago/lambda-proxy.git
+$ git clone https://github.com/layertwo/aws-lambda-proxy.git
 $ cd lambda-proxy
 $ pip install -e .[dev]
-```
-
-**Python3.7 only**
-
-This repo is set to use pre-commit to run *mypy*, *flake8*, *pydocstring* and *black* ("uncompromising Python code formatter") when committing new code.
-
-```bash
-$ pre-commit install
-$ git add .
-$ git commit -m'my change'
-   black.........................Passed
-   Flake8........................Passed
-   Verifying PEP257 Compliance...Passed
-   mypy..........................Passed
-$ git push origin
 ```
 
 ### License
 
 See [LICENSE.txt](/LICENSE.txt>).
-
-### Authors
-
-See [AUTHORS.txt](/AUTHORS.txt>).
-
-### Changes
-
-See [CHANGES.txt](/CHANGES.txt>).
