@@ -452,23 +452,38 @@ class API:
 
     def get(self, path: str, **kwargs) -> Callable:
         """Register GET route."""
-        kwargs.update({"methods": ["GET"]})
-
-        def _register_view(endpoint):
-            self._add_route(path, endpoint, **kwargs)
-            return endpoint
-
-        return _register_view
+        kwargs["methods"] = ["GET"]
+        return self.route(path, **kwargs)
 
     def post(self, path: str, **kwargs) -> Callable:
         """Register POST route."""
-        kwargs.update({"methods": ["POST"]})
+        kwargs["methods"] = ["POST"]
+        return self.route(path, **kwargs)
 
-        def _register_view(endpoint):
-            self._add_route(path, endpoint, **kwargs)
-            return endpoint
+    def put(self, path: str, **kwargs) -> Callable:
+        """Register PUT route."""
+        kwargs["methods"] = ["PUT"]
+        return self.route(path, **kwargs)
 
-        return _register_view
+    def patch(self, path: str, **kwargs) -> Callable:
+        """Register PATCH route."""
+        kwargs["methods"] = ["PATCH"]
+        return self.route(path, **kwargs)
+
+    def delete(self, path: str, **kwargs) -> Callable:
+        """Register DELETE route."""
+        kwargs["methods"] = ["DELETE"]
+        return self.route(path, **kwargs)
+
+    def options(self, path: str, **kwargs) -> Callable:
+        """Register OPTIONS route."""
+        kwargs["methods"] = ["OPTIONS"]
+        return self.route(path, **kwargs)
+
+    def head(self, path: str, **kwargs) -> Callable:
+        """Register HEAD route."""
+        kwargs["methods"] = ["HEAD"]
+        return self.route(path, **kwargs)
 
     def pass_context(self, f: Callable) -> Callable:
         """Decorator: pass the API Gateway context to the function."""

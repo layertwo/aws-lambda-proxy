@@ -30,22 +30,22 @@ funct = Mock(__name__="Mock")
 
 def test_value_converters():
     """Convert convert value to correct type."""
-    pathArg = "<string:v>"
-    assert "123" == proxy._converters("123", pathArg)
+    path_arg = "<string:v>"
+    assert "123" == proxy._converters("123", path_arg)
 
-    pathArg = "<int:v>"
-    assert 123 == proxy._converters("123", pathArg)
+    path_arg = "<int:v>"
+    assert 123 == proxy._converters("123", path_arg)
 
-    pathArg = "<float:v>"
-    assert 123.0 == proxy._converters("123", pathArg)
+    path_arg = "<float:v>"
+    assert 123.0 == proxy._converters("123", path_arg)
 
-    pathArg = "<uuid:v>"
+    path_arg = "<uuid:v>"
     assert "f5c21e12-8317-11e9-bf96-2e2ca3acb545" == proxy._converters(
-        "f5c21e12-8317-11e9-bf96-2e2ca3acb545", pathArg
+        "f5c21e12-8317-11e9-bf96-2e2ca3acb545", path_arg
     )
 
-    pathArg = "<v>"
-    assert "123" == proxy._converters("123", pathArg)
+    path_arg = "<v>"
+    assert "123" == proxy._converters("123", path_arg)
 
 
 def test_path_to_regex_convert():
@@ -1709,6 +1709,31 @@ def test_API_simpleRoute():
         """Return something."""
         return ("OK", "text/plain", body)
 
+    @app.put("/<user>")
+    def _put(user: str, body: str) -> Tuple[str, str, str]:
+        """Return something."""
+        return ("OK", "text/plain", body)
+
+    @app.patch("/<user>")
+    def _patch(user: str, body: str) -> Tuple[str, str, str]:
+        """Return something."""
+        return ("OK", "text/plain", body)
+
+    @app.delete("/<user>")
+    def _delete(user: str) -> Tuple[str, str, str]:
+        """Return something."""
+        return ("OK", "text/plain", user)
+
+    @app.options("/<user>")
+    def _options(user: str) -> Tuple[str, str, str]:
+        """Return something."""
+        return ("OK", "text/plain", user)
+
+    @app.head("/<user>")
+    def _head(user: str) -> Tuple[str, str, str]:
+        """Return something."""
+        return ("OK", "text/plain", user)
+
     @app.get("/<user>", tag=["users"], description="a route", cors=True)
     def _user(user: str) -> Tuple[str, str, str]:
         """Return something."""
@@ -1732,20 +1757,36 @@ def test_API_simpleRoute():
     assert res["headers"] == headers
     assert res["body"] == "remotepixel"
 
-    event = {
-        "path": "/test",
-        "httpMethod": "POST",
-        "headers": {},
-        "queryStringParameters": {},
-        "body": "yo",
-    }
-    headers = {
-        "Content-Type": "text/plain",
-    }
-    res = app(event, {})
-    assert res["statusCode"] == 200
-    assert res["headers"] == headers
-    assert res["body"] == "yo"
+    for method in ["POST", "PUT", "PATCH"]:
+        event = {
+            "path": "/test",
+            "httpMethod": method,
+            "headers": {},
+            "queryStringParameters": {},
+            "body": f"yo {method.lower()}",
+        }
+        headers = {
+            "Content-Type": "text/plain",
+        }
+        res = app(event, {})
+        assert res["statusCode"] == 200
+        assert res["headers"] == headers
+        assert res["body"] == f"yo {method.lower()}"
+
+    for method in ["DELETE", "OPTIONS", "HEAD"]:
+        event = {
+            "path": "/test",
+            "httpMethod": method,
+            "headers": {},
+            "queryStringParameters": {},
+        }
+        headers = {
+            "Content-Type": "text/plain",
+        }
+        res = app(event, {})
+        assert res["statusCode"] == 200
+        assert res["headers"] == headers
+        assert res["body"] == "test"
 
     # Clear logger handlers
     for h in app.log.handlers:
