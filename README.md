@@ -1,6 +1,10 @@
 # aws-lambda-proxy
 
-[![Packaging status](https://badge.fury.io/py/aws-lambda-proxy.svg)](https://badge.fury.io/py/aws-lambda-proxy)
+![GitHub License](https://img.shields.io/github/license/layertwo/aws-lambda-proxy)
+[![Packaging status](https://img.shields.io/pypi/v/aws-lambda-proxy)](https://pypi.org/project/aws-lambda-proxy/)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/aws-lambda-proxy)
+![Build status](https://img.shields.io/github/actions/workflow/status/layertwo/aws-lambda-proxy/python-package.yml?branch=main)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/aws-lambda-proxy)
 
 Forked from https://github.com/vincentsarago/lambda-proxy/
 
@@ -61,7 +65,7 @@ from aws_lambda_proxy import API, StatusCode
 
 APP = API(name="app")
 
-@APP.route('/test', methods=['POST']e)
+@APP.route('/test', methods=['POST'])
 def print_id(body):
     body = json.loads(body)
 ```
@@ -282,7 +286,7 @@ from aws_lambda_proxy import API, StatusCode
 APP = API(name="app")
 
 @APP.route('/test/<int:id>', methods=['GET'], cors=True)
-def print_id(id: int, num: float = 0.2) -> Tuple(str, str, str):
+def print_id(id: int, num: float = 0.2) -> Tuple[StatusCode, str, str]:
     return (StatusCode.OK, 'plain/text', id)
 ```
 
