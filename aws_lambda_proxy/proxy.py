@@ -3,21 +3,20 @@
 Freely adapted from https://github.com/aws/chalice
 
 """
-from typing import Any, Callable, Dict, List, Optional, Tuple, Sequence, Union
 
+import base64
 import inspect
-
+import json
+import logging
 import os
 import re
 import sys
-import json
-import zlib
-import base64
-import logging
 import warnings
+import zlib
 from functools import wraps
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
-from lambda_proxy import templates
+from aws_lambda_proxy import templates
 
 params_expr = re.compile(r"(<[^>]*>)")
 proxy_pattern = re.compile(r"/{(?P<name>.+)\+}$")
@@ -40,43 +39,38 @@ def _path_to_regex(path: str) -> str:
         "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
         path,
     )
-    for regexParam in re.findall(r"(<regex[^>]*>)", path):
-        matches = regex_pattern.search(regexParam)
+    for param in re.findall(r"(<regex[^>]*>)", path):
+        matches = regex_pattern.search(param)
         expr = matches.groupdict()["pattern"]
-        path = path.replace(regexParam, f"({expr})")
+        path = path.replace(param, f"({expr})")
 
     return path
 
 
 def _path_to_openapi(path: str) -> str:
-    for regexParam in re.findall(r"(<regex[^>]*>)", path):
-        match = regex_pattern.search(regexParam).groupdict()
+    for param in re.findall(r"(<regex[^>]*>)", path):
+        match = regex_pattern.search(param).groupdict()
         name = match["name"]
-        path = path.replace(regexParam, f"<regex:{name}>")
+        path = path.replace(param, f"<regex:{name}>")
 
     path = re.sub(r"<([a-zA-Z0-9_]+\:)?", "{", path)
     return re.sub(r">", "}", path)
 
 
-def _converters(value: str, pathArg: str) -> Any:
-    match = param_pattern.match(pathArg)
+def _converters(value: str, path_arg: str) -> Any:
+    match = param_pattern.match(path_arg)
     if match:
         arg_type = match.groupdict()["type"]
         if arg_type == "int":
             return int(value)
-        elif arg_type == "float":
+        if arg_type == "float":
             return float(value)
-        elif arg_type == "string":
+        if arg_type in ["string", "uuid"]:
             return value
-        elif arg_type == "uuid":
-            return value
-        else:
-            return value
-    else:
-        return value
+    return value
 
 
-class RouteEntry(object):
+class RouteEntry:
     """Decode request path."""
 
     def __init__(
@@ -142,7 +136,7 @@ def _get_request_path(event: Dict) -> Optional[str]:
     return event.get("path")
 
 
-class ApigwPath(object):
+class ApigwPath:
     """Parse path of API Call."""
 
     def __init__(self, event: Dict):
@@ -161,15 +155,14 @@ class ApigwPath(object):
     @property
     def prefix(self):
         """Return the API prefix."""
-        if self.apigw_stage and not self.apigw_stage == "$default":
+        if self.apigw_stage and self.apigw_stage != "$default":
             return f"/{self.apigw_stage}" + self.api_prefix
-        elif self.path_mapping:
+        if self.path_mapping:
             return self.path_mapping + self.api_prefix
-        else:
-            return self.api_prefix
+        return self.api_prefix
 
 
-class API(object):
+class API:
     """API."""
 
     FORMAT_STRING = "[%(name)s] - [%(levelname)s] - %(message)s"
@@ -207,7 +200,7 @@ class API(object):
             "x-forwarded-host", self.event["headers"].get("host", "")
         )
         path_info = self.request_path
-        if path_info.apigw_stage and not path_info.apigw_stage == "$default":
+        if path_info.apigw_stage and path_info.apigw_stage != "$default":
             host_suffix = f"/{path_info.apigw_stage}"
         else:
             host_suffix = path_info.path_mapping
@@ -379,15 +372,14 @@ class API(object):
 
         if kwargs:
             raise TypeError(
-                "TypeError: route() got unexpected keyword "
-                "arguments: %s" % ", ".join(list(kwargs))
+                f"TypeError: route() got unexpected keyword "
+                f"arguments: {', '.join(list(kwargs))}"
             )
 
         for method in methods:
             if self._checkroute(path, method):
                 raise ValueError(
-                    'Duplicate route detected: "{}"\n'
-                    "URL paths must be unique.".format(path)
+                    f'Duplicate route detected: "{path}"\n' "URL paths must be unique."
                 )
 
         route = RouteEntry(
@@ -456,7 +448,7 @@ class API(object):
 
     def get(self, path: str, **kwargs) -> Callable:
         """Register GET route."""
-        kwargs.update(dict(methods=["GET"]))
+        kwargs.update({"methods": ["GET"]})
 
         def _register_view(endpoint):
             self._add_route(path, endpoint, **kwargs)
@@ -466,7 +458,7 @@ class API(object):
 
     def post(self, path: str, **kwargs) -> Callable:
         """Register POST route."""
-        kwargs.update(dict(methods=["POST"]))
+        kwargs.update({"methods": ["POST"]})
 
         def _register_view(endpoint):
             self._add_route(path, endpoint, **kwargs)
@@ -494,7 +486,7 @@ class API(object):
 
     def setup_docs(self) -> None:
         """Add default documentation routes."""
-        openapi_url = f"/openapi.json"
+        openapi_url = "/openapi.json"
 
         def _openapi() -> Tuple[str, str, str]:
             """Return OpenAPI json."""
@@ -552,7 +544,7 @@ class API(object):
         including response code (status), headers and body
 
         """
-        statusCode = {
+        status_code = {
             "OK": 200,
             "EMPTY": 204,
             "NOK": 400,
@@ -575,22 +567,22 @@ class API(object):
             "image/jp2",
         ]
 
-        status = statusCode[status] if isinstance(status, str) else status
+        status = status_code[status] if isinstance(status, str) else status
 
-        messageData: Dict[str, Any] = {
+        message_data: Dict[str, Any] = {
             "statusCode": status,
             "headers": {"Content-Type": content_type},
         }
 
         if cors:
-            messageData["headers"]["Access-Control-Allow-Origin"] = "*"
-            messageData["headers"]["Access-Control-Allow-Methods"] = ",".join(
+            message_data["headers"]["Access-Control-Allow-Origin"] = "*"
+            message_data["headers"]["Access-Control-Allow-Methods"] = ",".join(
                 accepted_methods
             )
-            messageData["headers"]["Access-Control-Allow-Credentials"] = "true"
+            message_data["headers"]["Access-Control-Allow-Credentials"] = "true"
 
         if compression and compression in accepted_compression:
-            messageData["headers"]["Content-Encoding"] = compression
+            message_data["headers"]["Content-Encoding"] = compression
             if isinstance(response_body, str):
                 response_body = bytes(response_body, "utf-8")
 
@@ -619,23 +611,23 @@ class API(object):
                 )
 
         if ttl:
-            messageData["headers"]["Cache-Control"] = (
+            message_data["headers"]["Cache-Control"] = (
                 f"max-age={ttl}" if status == 200 else "no-cache"
             )
         elif cache_control:
-            messageData["headers"]["Cache-Control"] = (
+            message_data["headers"]["Cache-Control"] = (
                 cache_control if status == 200 else "no-cache"
             )
 
         if (
             content_type in binary_types or not isinstance(response_body, str)
         ) and b64encode:
-            messageData["isBase64Encoded"] = True
-            messageData["body"] = base64.b64encode(response_body).decode()
+            message_data["isBase64Encoded"] = True
+            message_data["body"] = base64.b64encode(response_body).decode()
         else:
-            messageData["body"] = response_body
+            message_data["body"] = response_body
 
-        return messageData
+        return message_data
 
     def __call__(self, event, context):
         """Initialize route and handlers."""
@@ -662,16 +654,13 @@ class API(object):
         http_method = event["httpMethod"]
         route_entry = self._url_matching(self.request_path.path, http_method)
         if not route_entry:
+            error_message = (
+                f"No view function for: {http_method} - {self.request_path.path}"
+            )
             return self.response(
                 "NOK",
                 "application/json",
-                json.dumps(
-                    {
-                        "errorMessage": "No view function for: {} - {}".format(
-                            http_method, self.request_path.path
-                        )
-                    }
-                ),
+                json.dumps({"errorMessage": error_message}),
             )
 
         request_params = event.get("queryStringParameters", {}) or {}
@@ -692,7 +681,7 @@ class API(object):
             body = event["body"]
             if event.get("isBase64Encoded"):
                 body = base64.b64decode(body).decode()
-            function_kwargs.update(dict(body=body))
+            function_kwargs.update({"body": body})
 
         try:
             response = route_entry.endpoint(**function_kwargs)

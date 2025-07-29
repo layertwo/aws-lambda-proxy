@@ -1,16 +1,15 @@
-"""Test lambda-proxy."""
+"""Test aws-lambda-proxy."""
 
-from typing import Dict, Tuple
-
-import os
-import json
-import zlib
 import base64
+import json
+import os
+import zlib
+from typing import Dict, Tuple
 
 import pytest
 from mock import Mock
 
-from lambda_proxy import proxy
+from aws_lambda_proxy import proxy
 
 json_api = os.path.join(os.path.dirname(__file__), "fixtures", "openapi.json")
 with open(json_api, "r") as f:

@@ -2,8 +2,8 @@ Lambda-proxy example
 --------------------
 
 ```
-$ git clone https://github.com/vincentsarag/lambda-proxy.git
-$ cd lambda-proxy
+$ git clone https://github.com/layertwo/aws-lambda-proxy.git
+$ cd aws-lambda-proxy
 $ pip install -U pip
 $ pip install -e .
 

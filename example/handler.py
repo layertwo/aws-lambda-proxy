@@ -1,11 +1,10 @@
 """app: handle requests."""
 
-from typing import Dict, Tuple
-import typing.io
-
 import json
+import typing.io
+from typing import Dict, Tuple
 
-from lambda_proxy.proxy import API
+from aws_lambda_proxy import API
 
 app = API(name="app", debug=True)
 
@@ -75,7 +74,10 @@ def bin() -> Tuple[str, str, typing.io.BinaryIO]:
 
 
 @app.get(
-    "/b64binary", cors=True, payload_compression_method="gzip", binary_b64encode=True,
+    "/b64binary",
+    cors=True,
+    payload_compression_method="gzip",
+    binary_b64encode=True,
 )
 def b64bin() -> Tuple[str, str, typing.io.BinaryIO]:
     """Return base64 encoded image."""
