@@ -16,7 +16,9 @@ import zlib
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-from aws_lambda_proxy import StatusCode, templates
+from aws_lambda_proxy import StatusCode
+from aws_lambda_proxy.templates import redoc, swagger
+from aws_lambda_proxy.types import Response
 
 params_expr = re.compile(r"(<[^>]*>)")
 proxy_pattern = re.compile(r"/{(?P<name>.+)\+}$")
@@ -77,7 +79,7 @@ class RouteEntry:
         self,
         endpoint: Callable,
         path: str,
-        methods: List = ["GET"],
+        methods: Optional[List[str]] = None,
         cors: bool = False,
         token: bool = False,
         payload_compression_method: str = "",
@@ -92,7 +94,7 @@ class RouteEntry:
         self.path = path
         self.route_regex = _path_to_regex(path)
         self.openapi_path = _path_to_openapi(self.path)
-        self.methods = methods
+        self.methods = methods or ["GET"]
         self.cors = cors
         self.token = token
         self.compression = payload_compression_method
@@ -508,23 +510,25 @@ class API:
         """Add default documentation routes."""
         openapi_url = "/openapi.json"
 
-        def _openapi() -> Tuple[StatusCode, str, str]:
+        def _openapi() -> Response:
             """Return OpenAPI json."""
-            return (
-                StatusCode.OK,
-                "application/json",
-                json.dumps(self._get_openapi(openapi_prefix=self.request_path.prefix)),
+            return Response(
+                status_code=StatusCode.OK,
+                content_type="application/json",
+                body=json.dumps(
+                    self._get_openapi(openapi_prefix=self.request_path.prefix)
+                ),
             )
 
         self._add_route(openapi_url, _openapi, cors=True, tag=["documentation"])
 
-        def _swagger_ui_html() -> Tuple[StatusCode, str, str]:
+        def _swagger_ui_html() -> Response:
             """Display Swagger HTML UI."""
             openapi_prefix = self.request_path.prefix
-            return (
-                StatusCode.OK,
-                "text/html",
-                templates.swagger(
+            return Response(
+                status_code=StatusCode.OK,
+                content_type="text/html",
+                body=swagger(
                     openapi_url=f"{openapi_prefix}{openapi_url}",
                     title=self.name + " - Swagger UI",
                 ),
@@ -532,13 +536,13 @@ class API:
 
         self._add_route("/docs", _swagger_ui_html, cors=True, tag=["documentation"])
 
-        def _redoc_ui_html() -> Tuple[StatusCode, str, str]:
+        def _redoc_ui_html() -> Response:
             """Display Redoc HTML UI."""
             openapi_prefix = self.request_path.prefix
-            return (
-                StatusCode.OK,
-                "text/html",
-                templates.redoc(
+            return Response(
+                status_code=StatusCode.OK,
+                content_type="text/html",
+                body=redoc(
                     openapi_url=f"{openapi_prefix}{openapi_url}",
                     title=self.name + " - ReDoc",
                 ),
@@ -548,11 +552,9 @@ class API:
 
     def response(
         self,
-        status: StatusCode,
-        content_type: str,
-        response_body: Any,
+        response: Response,
         cors: bool = False,
-        accepted_methods: Sequence = [],
+        accepted_methods: Optional[Sequence[str]] = None,
         accepted_compression: str = "",
         compression: str = "",
         b64encode: bool = False,
@@ -564,6 +566,7 @@ class API:
         including response code (status), headers and body
 
         """
+        accepted_methods = accepted_methods or []
         binary_types = [
             "application/octet-stream",
             "application/x-protobuf",
@@ -578,8 +581,8 @@ class API:
         ]
 
         message_data: Dict[str, Any] = {
-            "statusCode": status.value,
-            "headers": {"Content-Type": content_type},
+            "statusCode": response.status_code.value,
+            "headers": {"Content-Type": response.content_type},
         }
 
         if cors:
@@ -589,6 +592,7 @@ class API:
             )
             message_data["headers"]["Access-Control-Allow-Credentials"] = "true"
 
+        response_body = response.body
         if compression and compression in accepted_compression:
             message_data["headers"]["Content-Encoding"] = compression
             if isinstance(response_body, str):
@@ -611,27 +615,33 @@ class API:
                 )
             else:
                 return self.response(
-                    StatusCode.INTERNAL_SERVER_ERROR,
-                    "application/json",
-                    json.dumps(
-                        {"errorMessage": f"Unsupported compression mode: {compression}"}
-                    ),
+                    Response(
+                        status_code=StatusCode.INTERNAL_SERVER_ERROR,
+                        content_type="application/json",
+                        body=json.dumps(
+                            {
+                                "errorMessage": f"Unsupported compression mode: {compression}"
+                            }
+                        ),
+                    )
                 )
 
         if ttl:
             message_data["headers"]["Cache-Control"] = (
-                f"max-age={ttl}" if status == StatusCode.OK else "no-cache"
+                f"max-age={ttl}"
+                if response.status_code == StatusCode.OK
+                else "no-cache"
             )
         elif cache_control:
             message_data["headers"]["Cache-Control"] = (
-                cache_control if status == StatusCode.OK else "no-cache"
+                cache_control if response.status_code == StatusCode.OK else "no-cache"
             )
 
         if (
-            content_type in binary_types or not isinstance(response_body, str)
+            response.content_type in binary_types or not isinstance(response_body, str)
         ) and b64encode:
             message_data["isBase64Encoded"] = True
-            message_data["body"] = base64.b64encode(response_body).decode()
+            message_data["body"] = base64.b64encode(response_body).decode()  # type: ignore
         else:
             message_data["body"] = response_body
 
@@ -654,9 +664,11 @@ class API:
         self.request_path = ApigwPath(self.event)
         if self.request_path.path is None:
             return self.response(
-                StatusCode.BAD_REQUEST,
-                "application/json",
-                json.dumps({"errorMessage": "Missing or invalid path"}),
+                Response(
+                    status_code=StatusCode.BAD_REQUEST,
+                    content_type="application/json",
+                    body=json.dumps({"errorMessage": "Missing or invalid path"}),
+                )
             )
 
         http_method = event["httpMethod"]
@@ -666,18 +678,22 @@ class API:
                 f"No view function for: {http_method} - {self.request_path.path}"
             )
             return self.response(
-                StatusCode.BAD_REQUEST,
-                "application/json",
-                json.dumps({"errorMessage": error_message}),
+                Response(
+                    status_code=StatusCode.BAD_REQUEST,
+                    content_type="application/json",
+                    body=json.dumps({"errorMessage": error_message}),
+                )
             )
 
         request_params = event.get("queryStringParameters", {}) or {}
         if route_entry.token:
             if not self._validate_token(request_params.get("access_token")):
                 return self.response(
-                    StatusCode.INTERNAL_SERVER_ERROR,
-                    "application/json",
-                    json.dumps({"message": "Invalid access token"}),
+                    Response(
+                        status_code=StatusCode.INTERNAL_SERVER_ERROR,
+                        content_type="application/json",
+                        body=json.dumps({"message": "Invalid access token"}),
+                    )
                 )
 
         # remove access_token from kwargs
@@ -695,16 +711,14 @@ class API:
             response = route_entry.endpoint(**function_kwargs)
         except Exception as err:
             self.log.error(str(err))
-            response = (
-                StatusCode.INTERNAL_SERVER_ERROR,
-                "application/json",
-                json.dumps({"errorMessage": str(err)}),
+            response = Response(
+                status_code=StatusCode.INTERNAL_SERVER_ERROR,
+                content_type="application/json",
+                body=json.dumps({"errorMessage": str(err)}),
             )
 
         return self.response(
-            response[0],
-            response[1],
-            response[2],
+            response=response,
             cors=route_entry.cors,
             accepted_methods=route_entry.methods,
             accepted_compression=self.event["headers"].get("accept-encoding", ""),

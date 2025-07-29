@@ -37,31 +37,31 @@ open an issue.
 With GET request
 
 ```python
-from aws_lambda_proxy import API, StatusCode
+from aws_lambda_proxy import API, Response, StatusCode
 
 APP = API(name="app")
 
 @APP.route('/test/tests/<id>', methods=['GET'], cors=True)
 def print_id(id):
-    return (StatusCode.OK, 'plain/text', id)
+    return Response(status_code=StatusCode.OK, content_type='plain/text', body=id)
 ```
 
 With POST request
 
 ```python
-from aws_lambda_proxy import API, StatusCode
+from aws_lambda_proxy import API, Response, StatusCode
 
 APP = API(name="app")
 
 @APP.route('/test/tests/<id>', methods=['POST'], cors=True)
 def print_id(id, body):
-    return (StatusCode.OK, 'plain/text', id)
+    return Response(status_code=StatusCode.OK, content_type='plain/text', body=id)
 ```
 
 ## Binary body
 
 ```python
-from aws_lambda_proxy import API, StatusCode
+from aws_lambda_proxy import API
 
 APP = API(name="app")
 
@@ -93,11 +93,11 @@ example:
 ```python
 @APP.get("/app/<regex([a-z]+):regularuser>")
 def print_user(regularuser):
-    return (StatusCode.OK, 'plain/text', f"regular {regularuser}")
+    return Response(status_code=StatusCode.OK, content_type='plain/text', body=f"regular {regularuser}")
 
 @APP.get("/app/<regex([A-Z]+):capitaluser>")
 def print_user(capitaluser):
-    return (StatusCode.OK, 'plain/text', f"CAPITAL {capitaluser}")
+    return Response(status_code=StatusCode.OK, content_type='plain/text', body=f"CAPITAL {capitaluser}")
 ```
 
 #### Warning
@@ -107,11 +107,11 @@ when using **regex()** you must use different variable names or the route might 
 ```python
 @APP.get("/app/<regex([a-z]+):user>")
 def print_user(user):
-    return (StatusCode.OK, 'plain/text', f"regular {user}")
+    return Response(status_code=StatusCode.OK, content_type='plain/text', body=f"regular {user}")
 
 @APP.get("/app/<regex([A-Z]+):user>")
 def print_user(user):
-    return (StatusCode.OK, 'plain/text', f"CAPITAL {user}")
+    return Response(status_code=StatusCode.OK, content_type='plain/text', body=f"CAPITAL {user}")
 ```
 This app will work but the documentation will only show the second route because in `openapi.json`, route names will be `/app/{user}` for both routes.
 
@@ -133,12 +133,12 @@ This app will work but the documentation will only show the second route because
 Add a Cache Control header with a Time to Live (TTL) in seconds.
 
 ```python
-from aws_lambda_proxy import API, StatusCode
+from aws_lambda_proxy import API, Response, StatusCode
 APP = API(app_name="app")
 
 @APP.get('/test/tests/<id>', cors=True, cache_control="public,max-age=3600")
 def print_id(id):
-   return (StatusCode.OK, 'plain/text', id)
+   return Response(status_code=StatusCode.OK, content_type='plain/text', body=id)
 ```
 
 Note: If function returns other then "OK", Cache-Control will be set to `no-cache`
@@ -148,14 +148,14 @@ Note: If function returns other then "OK", Cache-Control will be set to `no-cach
 When working with binary on API-Gateway we must return a base64 encoded string
 
 ```python
-from aws_lambda_proxy import API, StatusCode
+from aws_lambda_proxy import API, Response, StatusCode
 
 APP = API(name="app")
 
 @APP.get('/test/tests/<filename>.jpg', cors=True, binary_b64encode=True)
 def print_id(filename):
     with open(f"{filename}.jpg", "rb") as f:
-        return (StatusCode.OK, 'image/jpeg', f.read())
+        return Response(status_code=StatusCode.OK, content_type='image/jpeg', body=f.read())
 ```
 
 ## Compression
@@ -163,7 +163,7 @@ def print_id(filename):
 Enable compression if "Accept-Encoding" if found in headers.
 
 ```python
-from aws_lambda_proxy import API, StatusCode
+from aws_lambda_proxy import API, Response, StatusCode
 
 APP = API(name="app")
 
@@ -175,7 +175,7 @@ APP = API(name="app")
 )
 def print_id(filename):
     with open(f"{filename}.jpg", "rb") as f:
-       return (StatusCode.OK, 'image/jpeg', f.read())
+       return Response(status_code=StatusCode.OK, content_type='image/jpeg', body=f.read())
 ```
 
 ## Simple Auth token
@@ -187,13 +187,13 @@ Lambda-proxy provide a simple token validation system.
    http://myurl/test/tests/myid?access_token=blabla)
 
 ```python
-from aws_lambda_proxy import API, StatusCode
+from aws_lambda_proxy import API, Response, StatusCode
 
 APP = API(name="app")
 
 @APP.get('/test/tests/<id>', cors=True, token=True)
 def print_id(id):
-    return (StatusCode.OK, 'plain/text', id)
+    return Response(status_code=StatusCode.OK, content_type='plain/text', body=id)
 ```
 
 ## URL schema and request parameters
@@ -201,13 +201,13 @@ def print_id(id):
 QueryString parameters are passed as function's options.
 
 ```python
-from aws_lambda_proxy import API, StatusCode
+from aws_lambda_proxy import API, Response, StatusCode
 
 APP = API(name="app")
 
 @APP.get('/<id>', cors=True)
 def print_id(id, name=None):
-    return (StatusCode.OK, 'plain/text', f"{id}{name}")
+    return Response(status_code=StatusCode.OK, content_type='plain/text', body=f"{id}{name}")
 ```
 
 requests:
@@ -223,13 +223,13 @@ $ curl /000001?name=layertwo
 ## Multiple Routes
 
 ```python
-from aws_lambda_proxy import API, StatusCode
+from aws_lambda_proxy import API, Response, StatusCode
 APP = API(name="app")
 
 @APP.get('/<id>', cors=True)
 @APP.get('/<id>/<int:number>', cors=True)
 def print_id(id, number=None, name=None):
-    return (StatusCode.OK, 'plain/text', f"{id}-{name}-{number}")
+    return Response(status_code=StatusCode.OK, content_type='plain/text', body=f"{id}-{name}-{number}")
 ```
 requests:
 
@@ -252,7 +252,7 @@ $ curl /000001/1?name=layertwo
 Pass event and context to the handler function.
 
 ```python
-from aws_lambda_proxy import API, StatusCode
+from aws_lambda_proxy import API, Response, StatusCode
 
 APP = API(name="app")
 
@@ -262,7 +262,7 @@ APP = API(name="app")
 def print_id(ctx, evt, id):
     print(ctx)
     print(evt)
-    return (StatusCode.OK, 'plain/text', f"{id}")
+    return Response(status_code=StatusCode.OK, content_type='plain/text', body=f"{id}")
 ```
 
 # Automatic OpenAPI documentation
@@ -281,13 +281,13 @@ By default the APP (`aws_lambda_proxy.API`) is provided with three (3) routes:
 To be able to render full and precise API documentation, aws_lambda_proxy uses python type hint and annotations [link](https://www.python.org/dev/peps/pep-3107/).
 
 ```python
-from aws_lambda_proxy import API, StatusCode
+from aws_lambda_proxy import API, Response, StatusCode 
 
 APP = API(name="app")
 
 @APP.route('/test/<int:id>', methods=['GET'], cors=True)
-def print_id(id: int, num: float = 0.2) -> Tuple[StatusCode, str, str]:
-    return (StatusCode.OK, 'plain/text', id)
+def print_id(id: int, num: float = 0.2) -> Response:
+    return Response(status_code=StatusCode.OK, content_type='plain/text', body=id)
 ```
 
 In the example above, our route `/test/<int:id>` define an input `id` to be a `INT`, while we also add this hint to the function `print_id` we also specify the type (and default) of the `num` option.
@@ -297,7 +297,7 @@ In the example above, our route `/test/<int:id>` define an input `id` to be a `I
 Note: When using path mapping other than `root` (`/`), `/` route won't be available.
 
 ```python
-from aws_lambda_proxy import API, StatusCode 
+from aws_lambda_proxy import API, Response, StatusCode 
 
 api = API(name="api", debug=True)
 
@@ -314,20 +314,20 @@ def index():
             Hello world
         </body>
     </html>"""
-    return (StatusCode.OK, "text/html", html)
+    return Response(status_code=StatusCode.OK, content_type="text/html", body=html)
 
 
 @api.get("/yo", cors=True)
 def yo():
-    return (StatusCode.OK, "text/plain", "YOOOOO")
+    return Response(status_code=StatusCode.OK, content_type="text/plain", body="YOOOOO")
 ```
 
 # Examples
 
--  https://github.com/aws-lambda-proxy/tree/main/example
+-  https://github.com/layertwo/aws-lambda-proxy/tree/main/example
 
 
-# Contribution & Devellopement
+# Contribution & Development
 
 Issues and pull requests are more than welcome.
 
