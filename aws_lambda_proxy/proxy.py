@@ -101,7 +101,11 @@ class RouteEntry:
         self.cache_control = cache_control
         self.description = description or self.endpoint.__doc__
         self.tag = tag
-        if self.compression and self.compression not in ["gzip", "zlib", "deflate"]:
+        if self.compression and self.compression not in [
+            "gzip",
+            "zlib",
+            "deflate",
+        ]:
             raise ValueError(
                 f"'{payload_compression_method}' is not a supported compression"
             )

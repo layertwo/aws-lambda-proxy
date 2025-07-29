@@ -1,0 +1,101 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aws-lambda-proxy"
+version = "1.0.0"
+description = "Simple AWS Lambda proxy to handle API Gateway request"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "BSD" }
+authors = [
+    { name = "Lucas Messenger", email = "1335960+layertwo@users.noreply.github.com" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+keywords = ["aws", "lambda", "apigateway", "proxy"]
+
+[project.optional-dependencies]
+test = [
+    "pytest==8.4.1",
+    "pytest-cov==6.2.1",
+    "black==25.1.0",
+    "isort==6.0.1",
+    "flake8==7.3.0",
+    "Flake8-pyproject==1.2.3",
+]
+
+[tool.setuptools.packages.find]
+include = ["aws_lambda_proxy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--verbose",
+    "--cov=aws_lambda_proxy",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--junitxml=reports/results.xml",
+]
+
+[tool.coverage.run]
+source = ["aws_lambda_proxy"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "build/*"
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py313"]
+src = ["aws_lambda_proxy/", "examples/", "tests/"]
+
+[tool.isort]
+profile = "black"
+src_paths = ["aws_lambda_proxy/", "examples/", "tests/"]
+line_length = 88
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = [
+    "E203",  # whitespace before ':'
+    "E266",  # too many leading '#' for block comment
+    "E501",  # line too long (handled by black)
+    "W503",  # line break before binary operator
+    "W504",  # line break after binary operator
+]
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    ".venv",
+    "venv",
+    ".eggs",
+    "*.egg-info",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".coverage",
+    "htmlcov",
+]
+per-file-ignores = [
+    "__init__.py:F401",  # imported but unused
+    "tests/*:S101",      # use of assert detected (if using flake8-bandit)
+]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "C90", # mccabe complexity
+]
