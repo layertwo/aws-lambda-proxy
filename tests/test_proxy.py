@@ -4,12 +4,12 @@ import base64
 import json
 import os
 import zlib
-from typing import Dict, Tuple
+from typing import Dict
 from unittest.mock import Mock
 
 import pytest
 
-from aws_lambda_proxy import StatusCode, proxy
+from aws_lambda_proxy import Response, StatusCode, proxy
 
 json_api = os.path.join(os.path.dirname(__file__), "fixtures", "openapi.json")
 with open(json_api, "r") as f:
@@ -174,7 +174,9 @@ def test_API_addRoute():
 def test_proxy_API():
     """Add and parse route."""
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "text/plain", "heyyyy"))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
+    )
     app._add_route("/test/<string:user>/<name>", funct, methods=["GET"], cors=True)
 
     event = {
@@ -201,7 +203,9 @@ def test_proxy_API():
 def test_proxy_APIpath():
     """Add and parse route."""
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "text/plain", "heyyyy"))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
+    )
     app._add_route("/test/<string:user>/<name>", funct, methods=["GET"], cors=True)
 
     event = {
@@ -229,7 +233,9 @@ def test_proxy_APIpath():
 def test_proxy_APIpathProxy():
     """Add and parse route."""
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "text/plain", "heyyyy"))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
+    )
     app._add_route("/test/<string:user>/<name>", funct, methods=["GET"], cors=True)
 
     event = {
@@ -258,7 +264,9 @@ def test_proxy_APIpathProxy():
 def test_proxy_APIpathCustomDomain():
     """Add and parse route."""
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "text/plain", "heyyyy"))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
+    )
     app._add_route("/test/<string:user>/<name>", funct, methods=["GET"], cors=True)
 
     event = {
@@ -287,7 +295,9 @@ def test_proxy_APIpathCustomDomain():
 def test_ttl():
     """Add and parse route."""
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "text/plain", "heyyyy"))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
+    )
     with pytest.warns(DeprecationWarning):
         app._add_route(
             "/test/<string:user>/<name>",
@@ -298,7 +308,7 @@ def test_ttl():
         )
         funct_error = Mock(
             __name__="Mock",
-            return_value=(StatusCode.BAD_REQUEST, "text/plain", "heyyyy"),
+            return_value=Response(StatusCode.BAD_REQUEST, "text/plain", "heyyyy"),
         )
         app._add_route("/yo", funct_error, methods=["GET"], cors=True, ttl=3600)
 
@@ -336,7 +346,9 @@ def test_ttl():
 def test_cache_control():
     """Add and parse route."""
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "text/plain", "heyyyy"))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
+    )
     app._add_route(
         "/test/<string:user>/<name>",
         funct,
@@ -345,7 +357,8 @@ def test_cache_control():
         cache_control="public,max-age=3600",
     )
     funct_error = Mock(
-        __name__="Mock", return_value=(StatusCode.BAD_REQUEST, "text/plain", "heyyyy")
+        __name__="Mock",
+        return_value=Response(StatusCode.BAD_REQUEST, "text/plain", "heyyyy"),
     )
     app._add_route(
         "/yo",
@@ -389,7 +402,9 @@ def test_cache_control():
 def test_querystringNull():
     """Add and parse route."""
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "text/plain", "heyyyy"))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
+    )
     app._add_route("/test/<user>", funct, methods=["GET"], cors=True)
 
     event = {
@@ -416,7 +431,9 @@ def test_querystringNull():
 def test_headersNull():
     """Add and parse route."""
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "text/plain", "heyyyy"))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
+    )
     app._add_route("/test/<user>", funct, methods=["GET"], cors=True)
 
     event = {
@@ -447,7 +464,9 @@ def test_API_encoding():
     body = b"thisisafakeencodedjpeg"
     b64body = base64.b64encode(body).decode()
 
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "image/jpeg", body))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "image/jpeg", body)
+    )
     app._add_route("/test/<user>.jpg", funct, methods=["GET"], cors=True)
 
     event = {
@@ -505,7 +524,9 @@ def test_API_compression():
     b64gzipbody = base64.b64encode(gzbody).decode()
 
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "image/jpeg", body))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "image/jpeg", body)
+    )
     app._add_route(
         "/test_compress/<user>.jpg",
         funct,
@@ -587,7 +608,9 @@ def test_API_compression():
 
     funct = Mock(
         __name__="Mock",
-        return_value=(StatusCode.OK, "application/json", json.dumps({"test": 0})),
+        return_value=Response(
+            StatusCode.OK, "application/json", json.dumps({"test": 0})
+        ),
     )
     # Should compress and encode to base64
     app._add_route(
@@ -655,7 +678,9 @@ def test_API_otherCompression():
     deflbody = deflate_compress.compress(body) + deflate_compress.flush()
 
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "image/jpeg", body))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "image/jpeg", body)
+    )
     app._add_route(
         "/test_deflate/<user>.jpg",
         funct,
@@ -719,7 +744,7 @@ def test_API_compression_invalid():
     app = proxy.API(name="test")
 
     def funct(user):
-        return (StatusCode.OK, "text/plain", "heyyyy")
+        return Response(StatusCode.OK, "text/plain", "heyyyy")
 
     entry = app._add_route(
         "/test/<user>",
@@ -748,7 +773,9 @@ def test_API_compression_invalid():
 def test_API_routeURL():
     """Should catch invalid route and parse valid args."""
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "text/plain", "heyyyy"))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
+    )
     app._add_route("/test/<user>", funct, methods=["GET"], cors=True)
 
     event = {
@@ -821,7 +848,9 @@ def test_API_routeURL():
     res = app(event, {})
     assert res == resp
 
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "text/plain", "heyyyy"))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
+    )
     app._add_route(
         "/test/<string:v>/<uuid:uuid>/<int:z>/<float:x>.<ext>",
         funct,
@@ -865,7 +894,9 @@ def test_API_routeToken(monkeypatch):
     monkeypatch.setenv("TOKEN", "yo")
 
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "text/plain", "heyyyy"))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
+    )
     app._add_route("/test/<user>", funct, methods=["GET"], cors=True, token=True)
 
     event = {
@@ -990,7 +1021,9 @@ def test_API_functionError():
 def test_API_Post():
     """Should work as expected on POST request."""
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "text/plain", "heyyyy"))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
+    )
     app._add_route("/test/<user>", funct, methods=["GET", "POST"], cors=True)
 
     event = {
@@ -1069,7 +1102,7 @@ def test_API_ctx():
     @app.pass_event
     @app.pass_context
     def print_id(ctx, evt, id, params=None):
-        return (
+        return Response(
             StatusCode.OK,
             "application/json",
             {"ctx": ctx, "evt": evt, "id": id, "params": params},
@@ -1109,7 +1142,7 @@ def test_API_multipleRoute():
     @app.route("/<user>", methods=["GET"], cors=True)
     @app.route("/<user>@<int:num>", methods=["GET"], cors=True)
     def print_id(user, num=None, params=None):
-        return (
+        return Response(
             StatusCode.OK,
             "application/json",
             json.dumps({"user": user, "num": num, "params": params}),
@@ -1161,24 +1194,24 @@ def test_API_doc():
     app = proxy.API(name="test")
 
     @app.route("/test", methods=["POST"])
-    def _post(body: str) -> Tuple[StatusCode, str, str]:
+    def _post(body: str) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "Yo")
+        return Response(StatusCode.OK, "text/plain", "Yo")
 
     @app.route("/<user>", methods=["GET"], tag=["users"], description="a route")
-    def _user(user: str) -> Tuple[StatusCode, str, str]:
+    def _user(user: str) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "Yo")
+        return Response(StatusCode.OK, "text/plain", "Yo")
 
     @app.route("/<int:num>", methods=["GET"], token=True)
-    def _num(num: int) -> Tuple[StatusCode, str, str]:
+    def _num(num: int) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "yo")
+        return Response(StatusCode.OK, "text/plain", "yo")
 
     @app.route("/<user>/<int:num>", methods=["GET"])
-    def _userandnum(user: str, num: int) -> Tuple[StatusCode, str, str]:
+    def _userandnum(user: str, num: int) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "yo")
+        return Response(StatusCode.OK, "text/plain", "yo")
 
     @app.route("/<user>/<float:num>", methods=["GET"])
     def _options(
@@ -1188,16 +1221,16 @@ def test_API_doc():
         opt2: int = 2,
         opt3: float = 2.0,
         **kwargs,
-    ) -> Tuple[StatusCode, str, str]:
+    ) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "yo")
+        return Response(StatusCode.OK, "text/plain", "yo")
 
     @app.route("/<user>/<num>", methods=["GET"])
     @app.pass_context
     @app.pass_event
-    def _ctx(evt: Dict, ctx: Dict, user: str, num: int) -> Tuple[StatusCode, str, str]:
+    def _ctx(evt: Dict, ctx: Dict, user: str, num: int) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "yo")
+        return Response(StatusCode.OK, "text/plain", "yo")
 
     event = {
         "path": "/openapi.json",
@@ -1262,24 +1295,24 @@ def test_API_doc_apigw():
     app = proxy.API(name="test")
 
     @app.route("/test", methods=["POST"])
-    def _post(body: str) -> Tuple[StatusCode, str, str]:
+    def _post(body: str) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "Yo")
+        return Response(StatusCode.OK, "text/plain", "Yo")
 
     @app.route("/<user>", methods=["GET"], tag=["users"], description="a route")
-    def _user(user: str) -> Tuple[StatusCode, str, str]:
+    def _user(user: str) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "Yo")
+        return Response(StatusCode.OK, "text/plain", "Yo")
 
     @app.route("/<int:num>", methods=["GET"], token=True)
-    def _num(num: int) -> Tuple[StatusCode, str, str]:
+    def _num(num: int) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "yo")
+        return Response(StatusCode.OK, "text/plain", "yo")
 
     @app.route("/<user>/<int:num>", methods=["GET"])
-    def _userandnum(user: str, num: int) -> Tuple[StatusCode, str, str]:
+    def _userandnum(user: str, num: int) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "yo")
+        return Response(StatusCode.OK, "text/plain", "yo")
 
     @app.route("/<user>/<float:num>", methods=["GET"])
     def _options(
@@ -1289,16 +1322,16 @@ def test_API_doc_apigw():
         opt2: int = 2,
         opt3: float = 2.0,
         **kwargs,
-    ) -> Tuple[StatusCode, str, str]:
+    ) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "yo")
+        return Response(StatusCode.OK, "text/plain", "yo")
 
     @app.route("/<user>/<num>", methods=["GET"])
     @app.pass_context
     @app.pass_event
-    def _ctx(evt: Dict, ctx: Dict, user: str, num: int) -> Tuple[StatusCode, str, str]:
+    def _ctx(evt: Dict, ctx: Dict, user: str, num: int) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "yo")
+        return Response(StatusCode.OK, "text/plain", "yo")
 
     event = {
         "path": "/openapi.json",
@@ -1348,24 +1381,24 @@ def test_API_docCustomDomain():
     app = proxy.API(name="test")
 
     @app.route("/test", methods=["POST"])
-    def _post(body: str) -> Tuple[StatusCode, str, str]:
+    def _post(body: str) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "Yo")
+        return Response(StatusCode.OK, "text/plain", "Yo")
 
     @app.route("/<user>", methods=["GET"], tag=["users"], description="a route")
-    def _user(user: str) -> Tuple[StatusCode, str, str]:
+    def _user(user: str) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "Yo")
+        return Response(StatusCode.OK, "text/plain", "Yo")
 
     @app.route("/<int:num>", methods=["GET"], token=True)
-    def _num(num: int) -> Tuple[StatusCode, str, str]:
+    def _num(num: int) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "yo")
+        return Response(StatusCode.OK, "text/plain", "yo")
 
     @app.route("/<user>/<int:num>", methods=["GET"])
-    def _userandnum(user: str, num: int) -> Tuple[StatusCode, str, str]:
+    def _userandnum(user: str, num: int) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "yo")
+        return Response(StatusCode.OK, "text/plain", "yo")
 
     @app.route("/<user>/<float:num>", methods=["GET"])
     def _options(
@@ -1375,16 +1408,16 @@ def test_API_docCustomDomain():
         opt2: int = 2,
         opt3: float = 2.0,
         **kwargs,
-    ) -> Tuple[StatusCode, str, str]:
+    ) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "yo")
+        return Response(StatusCode.OK, "text/plain", "yo")
 
     @app.route("/<user>/<num>", methods=["GET"])
     @app.pass_context
     @app.pass_event
-    def _ctx(evt: Dict, ctx: Dict, user: str, num: int) -> Tuple[StatusCode, str, str]:
+    def _ctx(evt: Dict, ctx: Dict, user: str, num: int) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", "yo")
+        return Response(StatusCode.OK, "text/plain", "yo")
 
     event = {
         "resource": "/{proxy+}",
@@ -1416,10 +1449,10 @@ def test_routeRegex():
     """Add and parse route."""
     app = proxy.API(name="test")
     funct_one = Mock(
-        __name__="Mock", return_value=(StatusCode.OK, "text/plain", "heyyyy")
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
     )
     funct_two = Mock(
-        __name__="Mock", return_value=(StatusCode.OK, "text/plain", "yooooo")
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "yooooo")
     )
     app._add_route(
         "/test/<regex([0-9]{4}):number>/<regex([a-z]{3}):name>",
@@ -1481,7 +1514,9 @@ def test_routeRegex():
 def test_routeRegexFailing():
     """Add and parse route."""
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "text/plain", "yooooo"))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "yooooo")
+    )
     app._add_route(
         r"/test/<regex(user(\d+)?):user>/<sport>",
         funct,
@@ -1623,7 +1658,9 @@ def testApigwPath():
 def testApigwHostUrl():
     """Test url property."""
     app = proxy.API(name="test")
-    funct = Mock(__name__="Mock", return_value=(StatusCode.OK, "text/plain", "heyyyy"))
+    funct = Mock(
+        __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
+    )
     app._add_route("/test/<string:user>/<name>", funct, methods=["GET"], cors=True)
 
     # resource "/", no apigwg, noproxy, no path mapping
@@ -1717,39 +1754,39 @@ def test_API_simpleRoute():
     app = proxy.API(name="test")
 
     @app.post("/test")
-    def _post(body: str) -> Tuple[StatusCode, str, str]:
+    def _post(body: str) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", body)
+        return Response(StatusCode.OK, "text/plain", body)
 
     @app.put("/<user>")
-    def _put(user: str, body: str) -> Tuple[StatusCode, str, str]:
+    def _put(user: str, body: str) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", body)
+        return Response(StatusCode.OK, "text/plain", body)
 
     @app.patch("/<user>")
-    def _patch(user: str, body: str) -> Tuple[StatusCode, str, str]:
+    def _patch(user: str, body: str) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", body)
+        return Response(StatusCode.OK, "text/plain", body)
 
     @app.delete("/<user>")
-    def _delete(user: str) -> Tuple[StatusCode, str, str]:
+    def _delete(user: str) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", user)
+        return Response(StatusCode.OK, "text/plain", user)
 
     @app.options("/<user>")
-    def _options(user: str) -> Tuple[StatusCode, str, str]:
+    def _options(user: str) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", user)
+        return Response(StatusCode.OK, "text/plain", user)
 
     @app.head("/<user>")
-    def _head(user: str) -> Tuple[StatusCode, str, str]:
+    def _head(user: str) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", user)
+        return Response(StatusCode.OK, "text/plain", user)
 
     @app.get("/<user>", tag=["users"], description="a route", cors=True)
-    def _user(user: str) -> Tuple[StatusCode, str, str]:
+    def _user(user: str) -> Response:
         """Return something."""
-        return (StatusCode.OK, "text/plain", user)
+        return Response(StatusCode.OK, "text/plain", user)
 
     event = {
         "path": "/remotepixel",

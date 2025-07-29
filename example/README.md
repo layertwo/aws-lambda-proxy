@@ -15,6 +15,10 @@ $ python cli.py
 
 
 ```python
+from aws_lambda_proxy import API, Response, StatusCode 
+
+APP = API(name="api")
+
 @APP.route(
     "/<user>",
     methods=["GET"],
@@ -22,7 +26,7 @@ $ python cli.py
 )
 def main(user):
     """Return JSON Object."""
-    return ("OK", "text/plain", user)
+    return Response(status_code=StatusCode.OK, content_type="text/plain", body=user)
 ```
 
 ```
@@ -45,7 +49,7 @@ $ curl -i http://127.0.0.1:8000/
 @APP.route("/<string:user>@<int:num>", methods=["GET"], cors=True)
 def main(user, num=0):
     """Return JSON Object."""
-    return ("OK", "text/plain", f"{user}-{num}")
+    return Response(status_code=StatusCode.OK, content_type="text/plain", body=f"{user}-{num}")
 ```
 
 ```
@@ -68,7 +72,7 @@ $ curl -i http://127.0.0.1:8000/jqtrde@2
 )
 def json_handler():
     """Return JSON Object."""
-    return ("OK", "application/json", json.dumps({"app": "it works"}))
+    return Response(status_code=StatusCode.OK, content_type="application/json", body=json.dumps({"app": "it works"}))
 ```
 
 ```
@@ -97,10 +101,10 @@ $ curl -i http://127.0.0.1:8000/json
 def bin():
     """Return image."""
     with open("./rpix.png", "rb") as f:
-        return (
-            "OK",
-            "image/png",
-            f.read()
+        return Response(
+            status_code=StatusCode.OK,
+            content_type="image/png",
+            body=f.read()
         )
 ```
 
@@ -160,10 +164,10 @@ $ curl -v --compressed http://127.0.0.1:8000/binary > image.png
 def b64bin():
     """Return base64 encoded image."""
     with open("./rpix.png", "rb") as f:
-        return (
-            "OK",
-            "image/png",
-            f.read()
+        return Response(
+            status_code=StatusCode.OK,
+            content_type="image/png",
+            body=f.read()
         )
 ```
 
