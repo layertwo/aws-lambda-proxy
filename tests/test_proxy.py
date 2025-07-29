@@ -5,9 +5,9 @@ import json
 import os
 import zlib
 from typing import Dict, Tuple
+from unittest.mock import Mock
 
 import pytest
-from mock import Mock
 
 from aws_lambda_proxy import proxy
 
@@ -316,7 +316,11 @@ def test_ttl():
     funct = Mock(__name__="Mock", return_value=("OK", "text/plain", "heyyyy"))
     with pytest.warns(DeprecationWarning):
         app._add_route(
-            "/test/<string:user>/<name>", funct, methods=["GET"], cors=True, ttl=3600
+            "/test/<string:user>/<name>",
+            funct,
+            methods=["GET"],
+            cors=True,
+            ttl=3600,
         )
         funct_error = Mock(
             __name__="Mock", return_value=("NOK", "text/plain", "heyyyy")
@@ -1412,7 +1416,10 @@ def test_routeRegex():
         cors=True,
     )
     app._add_route(
-        "/test/<regex([0-9]{4}):number>/<name>", funct_one, methods=["GET"], cors=True
+        "/test/<regex([0-9]{4}):number>/<name>",
+        funct_one,
+        methods=["GET"],
+        cors=True,
     )
     event = {
         "path": "/test/1234/pixel",
@@ -1464,7 +1471,10 @@ def test_routeRegexFailing():
     app = proxy.API(name="test")
     funct = Mock(__name__="Mock", return_value=("OK", "text/plain", "yooooo"))
     app._add_route(
-        r"/test/<regex(user(\d+)?):user>/<sport>", funct, methods=["GET"], cors=True
+        r"/test/<regex(user(\d+)?):user>/<sport>",
+        funct,
+        methods=["GET"],
+        cors=True,
     )
     event = {
         "path": "/test/user1234/rugby",
