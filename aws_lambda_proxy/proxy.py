@@ -17,6 +17,12 @@ from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from aws_lambda_proxy import StatusCode
+from aws_lambda_proxy.gateway import ApigwPath
+from aws_lambda_proxy.patterns import (
+    param_pattern,
+    params_expr,
+)
+from aws_lambda_proxy.routing import RouteEntry, _converters
 from aws_lambda_proxy.templates import redoc, swagger
 from aws_lambda_proxy.types import Response
 
@@ -32,153 +38,6 @@ BINARY_TYPES = [
     "image/webp",
     "image/jp2",
 ]
-
-params_expr = re.compile(r"(<[^>]*>)")
-proxy_pattern = re.compile(r"/{(?P<name>.+)\+}$")
-param_pattern = re.compile(
-    r"^<((?P<type>[a-zA-Z0-9_]+)(\((?P<pattern>.+)\))?\:)?(?P<name>[a-zA-Z0-9_]+)>$"
-)
-regex_pattern = re.compile(
-    r"^<(?P<type>regex)\((?P<pattern>.+)\):(?P<name>[a-zA-Z0-9_]+)>$"
-)
-
-
-def _path_to_regex(path: str) -> str:
-    path = f"^{path}$"  # full match
-    path = re.sub(r"<[a-zA-Z0-9_]+>", r"([a-zA-Z0-9_]+)", path)
-    path = re.sub(r"<string\:[a-zA-Z0-9_]+>", r"([a-zA-Z0-9_]+)", path)
-    path = re.sub(r"<int\:[a-zA-Z0-9_]+>", r"([0-9]+)", path)
-    path = re.sub(r"<float\:[a-zA-Z0-9_]+>", "([+-]?[0-9]+.[0-9]+)", path)
-    path = re.sub(
-        r"<uuid\:[a-zA-Z0-9_]+>",
-        "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
-        path,
-    )
-    for param in re.findall(r"(<regex[^>]*>)", path):
-        matches = regex_pattern.search(param)
-        expr = matches.groupdict()["pattern"]
-        path = path.replace(param, f"({expr})")
-
-    return path
-
-
-def _path_to_openapi(path: str) -> str:
-    for param in re.findall(r"(<regex[^>]*>)", path):
-        match = regex_pattern.search(param).groupdict()
-        name = match["name"]
-        path = path.replace(param, f"<regex:{name}>")
-
-    path = re.sub(r"<([a-zA-Z0-9_]+\:)?", "{", path)
-    return re.sub(r">", "}", path)
-
-
-def _converters(value: str, path_arg: str) -> Any:
-    match = param_pattern.match(path_arg)
-    if match:
-        arg_type = match.groupdict()["type"]
-        if arg_type == "int":
-            return int(value)
-        if arg_type == "float":
-            return float(value)
-        if arg_type in ["string", "uuid"]:
-            return value
-    return value
-
-
-class RouteEntry:
-    """Decode request path."""
-
-    def __init__(
-        self,
-        endpoint: Callable,
-        path: str,
-        methods: Optional[List[str]] = None,
-        cors: bool = False,
-        token: bool = False,
-        payload_compression_method: str = "",
-        binary_b64encode: bool = False,
-        ttl: Optional[int] = None,
-        cache_control: Optional[str] = None,
-        description: Optional[str] = None,
-        tag: Optional[Tuple] = None,
-    ) -> None:
-        """Initialize route object."""
-        self.endpoint = endpoint
-        self.path = path
-        self.route_regex = _path_to_regex(path)
-        self.openapi_path = _path_to_openapi(self.path)
-        self.methods = methods or ["GET"]
-        self.cors = cors
-        self.token = token
-        self.compression = payload_compression_method
-        self.b64encode = binary_b64encode
-        self.ttl = ttl
-        self.cache_control = cache_control
-        self.description = description or self.endpoint.__doc__
-        self.tag = tag
-        if self.compression and self.compression not in [
-            "gzip",
-            "zlib",
-            "deflate",
-        ]:
-            raise ValueError(
-                f"'{payload_compression_method}' is not a supported compression"
-            )
-
-    def __eq__(self, other) -> bool:
-        """Check for equality."""
-        return self.__dict__ == other.__dict__
-
-    def _get_path_args(self) -> Sequence[Any]:
-        route_args = [i.group() for i in params_expr.finditer(self.path)]
-        args = [param_pattern.match(arg).groupdict() for arg in route_args]
-        return args
-
-
-def _get_apigw_stage(event: Dict) -> str:
-    """Return API Gateway stage name."""
-    header = event.get("headers", {})
-    host = header.get("x-forwarded-host", header.get("host", ""))
-    if ".execute-api." in host and ".amazonaws.com" in host:
-        stage = event["requestContext"].get("stage", "")
-        return stage
-    return ""
-
-
-def _get_request_path(event: Dict) -> Optional[str]:
-    """Return API call path."""
-    resource_proxy = proxy_pattern.search(event.get("resource", "/"))
-    if resource_proxy:
-        proxy_path = event["pathParameters"].get(resource_proxy["name"])
-        return f"/{proxy_path}"
-
-    return event.get("path")
-
-
-class ApigwPath:
-    """Parse path of API Call."""
-
-    def __init__(self, event: Dict):
-        """Initialize API Gateway Path Info object."""
-        self.version = event.get("version")
-        self.apigw_stage = _get_apigw_stage(event)
-        self.path = _get_request_path(event)
-        self.api_prefix = proxy_pattern.sub("", event.get("resource", "")).rstrip("/")
-        if not self.apigw_stage and self.path:
-            path = event.get("path", "")
-            suffix = self.api_prefix + self.path
-            self.path_mapping = path.replace(suffix, "")
-        else:
-            self.path_mapping = ""
-
-    @property
-    def prefix(self):
-        """Return the API prefix."""
-        if self.apigw_stage and self.apigw_stage != "$default":
-            return f"/{self.apigw_stage}" + self.api_prefix
-        if self.path_mapping:
-            return self.path_mapping + self.api_prefix
-        return self.api_prefix
 
 
 class API:
