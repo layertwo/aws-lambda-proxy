@@ -2,50 +2,41 @@
 
 import base64
 import json
-import os
 import zlib
 from typing import Dict
 from unittest.mock import Mock
 
 import pytest
 
-from aws_lambda_proxy import Response, StatusCode, proxy
-
-json_api = os.path.join(os.path.dirname(__file__), "fixtures", "openapi.json")
-with open(json_api, "r") as f:
-    openapi_content = json.loads(f.read())
-
-json_api_custom = os.path.join(
-    os.path.dirname(__file__), "fixtures", "openapi_custom.json"
+from aws_lambda_proxy import StatusCode
+from aws_lambda_proxy.proxy import API
+from aws_lambda_proxy.routing import (
+    RouteEntry,
+    _converters,
+    _path_to_openapi,
+    _path_to_regex,
 )
-with open(json_api_custom, "r") as f:
-    openapi_custom_content = json.loads(f.read())
-
-json_apigw = os.path.join(os.path.dirname(__file__), "fixtures", "openapi_apigw.json")
-with open(json_apigw, "r") as f:
-    openapi_apigw_content = json.loads(f.read())
-
-funct = Mock(__name__="Mock")
+from aws_lambda_proxy.types import Response
 
 
 def test_value_converters():
     """Convert convert value to correct type."""
     path_arg = "<string:v>"
-    assert "123" == proxy._converters("123", path_arg)
+    assert "123" == _converters("123", path_arg)
 
     path_arg = "<int:v>"
-    assert 123 == proxy._converters("123", path_arg)
+    assert 123 == _converters("123", path_arg)
 
     path_arg = "<float:v>"
-    assert 123.0 == proxy._converters("123", path_arg)
+    assert 123.0 == _converters("123", path_arg)
 
     path_arg = "<uuid:v>"
-    assert "f5c21e12-8317-11e9-bf96-2e2ca3acb545" == proxy._converters(
+    assert "f5c21e12-8317-11e9-bf96-2e2ca3acb545" == _converters(
         "f5c21e12-8317-11e9-bf96-2e2ca3acb545", path_arg
     )
 
     path_arg = "<v>"
-    assert "123" == proxy._converters("123", path_arg)
+    assert "123" == _converters("123", path_arg)
 
 
 def test_path_to_regex_convert():
@@ -53,19 +44,19 @@ def test_path_to_regex_convert():
     path = "/jqtrde/<a>/<string:path>/<int:num>/<float:fl>/<uuid:id>/<regex([A-Z0-9]{5}):var>/<regex([a-z]{1}):othervar>"
     assert (
         "^/jqtrde/([a-zA-Z0-9_]+)/([a-zA-Z0-9_]+)/([0-9]+)/([+-]?[0-9]+.[0-9]+)/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/([A-Z0-9]{5})/([a-z]{1})$"
-        == proxy._path_to_regex(path)
+        == _path_to_regex(path)
     )
 
 
 def test_path_to_openapi_converters():
     """Convert proxy path to openapi path."""
     path = "/<string:num>/<test>-<regex([0-1]{4}):var>"
-    assert "/{num}/{test}-{var}" == proxy._path_to_openapi(path)
+    assert "/{num}/{test}-{var}" == _path_to_openapi(path)
 
 
-def test_RouteEntry_default():
+def test_RouteEntry_default(funct):
     """Should work as expected."""
-    route = proxy.RouteEntry(funct, "/endpoint/test/<id>")
+    route = RouteEntry(funct, "/endpoint/test/<id>")
     assert route.endpoint == funct
     assert route.methods == ["GET"]
     assert not route.cors
@@ -74,9 +65,9 @@ def test_RouteEntry_default():
     assert not route.b64encode
 
 
-def test_RouteEntry_Options():
+def test_RouteEntry_Options(funct):
     """Should work as expected."""
-    route = proxy.RouteEntry(
+    route = RouteEntry(
         funct,
         "/endpoint/test/<id>",
         ["POST"],
@@ -93,12 +84,11 @@ def test_RouteEntry_Options():
     assert route.b64encode
 
 
-def test_RouteEntry_invalidCompression():
+def test_RouteEntry_invalidCompression(funct):
     """Should work as expected."""
     with pytest.raises(ValueError):
-        proxy.RouteEntry(
+        RouteEntry(
             funct,
-            "my-function",
             "/endpoint/test/<id>",
             payload_compression_method="nope",
         )
@@ -106,7 +96,7 @@ def test_RouteEntry_invalidCompression():
 
 def test_API_init():
     """Should work as expected."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     assert app.name == "test"
     assert len(list(app.routes)) == 3
     assert not app.debug
@@ -117,9 +107,234 @@ def test_API_init():
         app.log.removeHandler(h)
 
 
+# Additional coverage tests for proxy module
+
+
+def test_already_configured_no_handlers():
+    """Test _already_configured method when logger has no handlers."""
+    import logging
+
+    app = API(name="test", configure_logs=False)
+    # Create a logger with no handlers
+    empty_logger = logging.getLogger("empty_test")
+    empty_logger.handlers = []
+
+    # This should return False when no handlers exist
+    result = app._already_configured(empty_logger)
+    assert result is False
+
+
+def test_already_configured_with_different_stream():
+    """Test _already_configured method when handler has different stream."""
+    import logging
+    import sys
+
+    app = API(name="test", configure_logs=False)
+
+    # Create a logger with a handler that doesn't use stdout
+    test_logger = logging.getLogger("stream_test")
+    test_logger.handlers = []
+
+    # Add a handler with a different stream
+    handler = logging.StreamHandler(sys.stderr)  # Not stdout
+    test_logger.addHandler(handler)
+
+    result = app._already_configured(test_logger)
+    assert result is False
+
+    # Clean up
+    test_logger.removeHandler(handler)
+
+
+def test_get_parameters_required_query_param():
+    """Test _get_parameters with a required query parameter (no default)."""
+
+    app = API(name="test")
+
+    def endpoint_with_required_param(path_param: str, required_query: str):
+        """Test endpoint with required query parameter."""
+        return Response(StatusCode.OK, "text/plain", "test")
+
+    route = RouteEntry(endpoint_with_required_param, "/<path_param>")
+    parameters = app._get_parameters(route)
+
+    # Should have both path parameter and required query parameter
+    assert len(parameters) == 2
+
+    # Find the query parameter
+    query_param = next(p for p in parameters if p["in"] == "query")
+    assert query_param["name"] == "required_query"
+    assert query_param["required"] is True
+    assert query_param["schema"]["format"] == "string"
+
+
+def test_get_parameters_var_keyword():
+    """Test _get_parameters with **kwargs parameter."""
+    app = API(name="test")
+
+    def endpoint_with_kwargs(path_param: str, **kwargs):
+        """Test endpoint with **kwargs."""
+        return Response(StatusCode.OK, "text/plain", "test")
+
+    route = RouteEntry(endpoint_with_kwargs, "/<path_param>")
+    parameters = app._get_parameters(route)
+
+    # Should have path parameter and kwargs parameter
+    assert len(parameters) == 2
+
+    # Find the kwargs parameter
+    kwargs_param = next(p for p in parameters if p["name"] == "kwargs")
+    assert kwargs_param["in"] == "query"
+    assert kwargs_param["schema"]["format"] == "dict"
+
+
+def test_get_openapi_with_description():
+    """Test _get_openapi when API has description."""
+    app = API(name="test", description="Test API description")
+
+    @app.get("/test")
+    def test_endpoint():
+        """Test endpoint."""
+        return Response(StatusCode.OK, "text/plain", "test")
+
+    openapi_doc = app._get_openapi()
+
+    assert "description" in openapi_doc["info"]
+    assert openapi_doc["info"]["description"] == "Test API description"
+
+
+def test_add_route_token_boolean():
+    """Test _add_route with token as boolean (line 145 coverage)."""
+    app = API(name="test")
+
+    def test_endpoint():
+        return Response(StatusCode.OK, "text/plain", "test")
+
+    # Test with token=True (boolean, not string)
+    route = app._add_route("/test", test_endpoint, token=True)
+    assert route.token is True
+
+
+def test_get_parameters_regex_type():
+    """Test _get_parameters with regex parameter type (line coverage)."""
+    app = API(name="test")
+
+    def endpoint_with_regex_param(user_id):
+        """Test endpoint with regex parameter."""
+        return Response(StatusCode.OK, "text/plain", f"User {user_id}")
+
+    # Create route with regex parameter
+    route = RouteEntry(endpoint_with_regex_param, "/user/<regex([0-9]+):user_id>")
+    parameters = app._get_parameters(route)
+
+    # Should have the regex parameter with pattern
+    assert len(parameters) == 1
+    param = parameters[0]
+    assert param["name"] == "user_id"
+    assert param["schema"]["type"] == "string"
+    assert "pattern" in param["schema"]
+    assert param["schema"]["pattern"] == "^[0-9]+$"
+
+
+def test_get_openapi_with_components():
+    """Test _get_openapi when components are added (line 115)."""
+    app = API(name="test")
+
+    @app.get("/secure", token=True)
+    def secure_endpoint():
+        """Secure endpoint requiring token."""
+        return Response(StatusCode.OK, "text/plain", "secure")
+
+    openapi_doc = app._get_openapi()
+
+    # Should have components section with security schemes
+    assert "components" in openapi_doc
+    assert "securitySchemes" in openapi_doc["components"]
+    assert "access_token" in openapi_doc["components"]["securitySchemes"]
+
+
+def test_get_parameters_path_with_default():
+    """Test _get_parameters with path parameter that has default value."""
+    app = API(name="test")
+
+    def endpoint_with_default(path_param: str = "default_value"):
+        """Test endpoint with default parameter."""
+        return Response(StatusCode.OK, "text/plain", "test")
+
+    route = RouteEntry(endpoint_with_default, "/<path_param>")
+    parameters = app._get_parameters(route)
+
+    # Should have parameter with default value
+    assert len(parameters) == 1
+    param = parameters[0]
+    assert param["name"] == "path_param"
+    assert "default" in param["schema"]
+    assert param["schema"]["default"] == "default_value"
+    assert "required" not in param  # Should not be required since it has default
+
+
+def test_host_property_with_path_mapping():
+    """Test host property when apigw_stage is None or $default (lines 74-84)."""
+
+    app = API(name="test")
+
+    # Mock event and request_path to trigger the else branch
+    app.event = {"headers": {"host": "api.example.com"}}
+
+    # Create a mock ApigwPath with path_mapping
+    mock_path = Mock()
+    mock_path.apigw_stage = None  # This should trigger the else branch
+    mock_path.path_mapping = "/stage"
+    app.request_path = mock_path
+
+    host = app.host
+    assert host == "https://api.example.com/stage"
+
+    # Test with $default stage
+    mock_path.apigw_stage = "$default"
+    host = app.host
+    assert host == "https://api.example.com/stage"
+
+
+def test_host_property_with_x_forwarded_host():
+    """Test host property with x-forwarded-host header."""
+    app = API(name="test")
+
+    # Test with x-forwarded-host (should take precedence over host)
+    app.event = {
+        "headers": {
+            "x-forwarded-host": "forwarded.example.com",
+            "host": "original.example.com",
+        }
+    }
+
+    mock_path = Mock()
+    mock_path.apigw_stage = "prod"
+    mock_path.path_mapping = "/mapping"
+    app.request_path = mock_path
+
+    host = app.host
+    assert host == "https://forwarded.example.com/prod"
+
+
+def test_host_property_http_scheme():
+    """Test host property with HTTP scheme instead of HTTPS."""
+    app = API(name="test", https=False)  # Set HTTPS to False
+
+    app.event = {"headers": {"host": "api.example.com"}}
+
+    mock_path = Mock()
+    mock_path.apigw_stage = "dev"
+    mock_path.path_mapping = "/mapping"
+    app.request_path = mock_path
+
+    host = app.host
+    assert host == "http://api.example.com/dev"  # Should use HTTP
+
+
 def test_API_noDocs():
     """Do not set default documentation routes."""
-    app = proxy.API(name="test", add_docs=False)
+    app = API(name="test", add_docs=False)
     assert app.name == "test"
     assert len(list(app.routes)) == 0
     assert not app.debug
@@ -132,7 +347,7 @@ def test_API_noDocs():
 
 def test_API_noLog():
     """Should work as expected."""
-    app = proxy.API(name="test", configure_logs=False)
+    app = API(name="test", configure_logs=False)
     assert app.name == "test"
     assert not app.debug
     assert app.log
@@ -144,7 +359,7 @@ def test_API_noLog():
 
 def test_API_logDebug():
     """Should work as expected."""
-    app = proxy.API(name="test", debug=True)
+    app = API(name="test", debug=True)
     assert app.log.getEffectiveLevel() == 10  # DEBUG
 
     # Clear logger handlers
@@ -152,9 +367,9 @@ def test_API_logDebug():
         app.log.removeHandler(h)
 
 
-def test_API_addRoute():
+def test_API_addRoute(funct):
     """Add and parse route."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     assert len(list(app.routes)) == 3
 
     app._add_route("/endpoint/test/<id>", funct, methods=["GET"], cors=True, token="yo")
@@ -173,7 +388,7 @@ def test_API_addRoute():
 
 def test_proxy_API():
     """Add and parse route."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
     )
@@ -202,7 +417,7 @@ def test_proxy_API():
 
 def test_proxy_APIpath():
     """Add and parse route."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
     )
@@ -232,7 +447,7 @@ def test_proxy_APIpath():
 
 def test_proxy_APIpathProxy():
     """Add and parse route."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
     )
@@ -263,7 +478,7 @@ def test_proxy_APIpathProxy():
 
 def test_proxy_APIpathCustomDomain():
     """Add and parse route."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
     )
@@ -294,7 +509,7 @@ def test_proxy_APIpathCustomDomain():
 
 def test_ttl():
     """Add and parse route."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
     )
@@ -345,7 +560,7 @@ def test_ttl():
 
 def test_cache_control():
     """Add and parse route."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
     )
@@ -401,7 +616,7 @@ def test_cache_control():
 
 def test_querystringNull():
     """Add and parse route."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
     )
@@ -430,7 +645,7 @@ def test_querystringNull():
 
 def test_headersNull():
     """Add and parse route."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
     )
@@ -459,7 +674,7 @@ def test_headersNull():
 
 def test_API_custom_headers():
     """Add and parse route."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock",
         return_value=Response(
@@ -494,7 +709,7 @@ def test_API_custom_headers():
 
 def test_API_encoding():
     """Test b64 encoding."""
-    app = proxy.API(name="test")
+    app = API(name="test")
 
     body = b"thisisafakeencodedjpeg"
     b64body = base64.b64encode(body).decode()
@@ -558,7 +773,7 @@ def test_API_compression():
     gzbody = gzip_compress.compress(body) + gzip_compress.flush()
     b64gzipbody = base64.b64encode(gzbody).decode()
 
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "image/jpeg", body)
     )
@@ -712,7 +927,7 @@ def test_API_otherCompression():
     zlibbody = zlib_compress.compress(body) + zlib_compress.flush()
     deflbody = deflate_compress.compress(body) + deflate_compress.flush()
 
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "image/jpeg", body)
     )
@@ -776,7 +991,7 @@ def test_API_otherCompression():
 
 def test_API_compression_invalid():
     """Test other compression."""
-    app = proxy.API(name="test")
+    app = API(name="test")
 
     def funct(user):
         return Response(StatusCode.OK, "text/plain", "heyyyy")
@@ -807,7 +1022,7 @@ def test_API_compression_invalid():
 
 def test_API_routeURL():
     """Should catch invalid route and parse valid args."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
     )
@@ -928,7 +1143,7 @@ def test_API_routeToken(monkeypatch):
     """Validate tokens."""
     monkeypatch.setenv("TOKEN", "yo")
 
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
     )
@@ -1025,7 +1240,7 @@ def test_API_routeToken(monkeypatch):
 
 def test_API_functionError():
     """Add and parse route."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(__name__="Mock", side_effect=Exception("hey something went wrong"))
     app._add_route("/test/<user>", funct, methods=["GET"], cors=True)
 
@@ -1055,7 +1270,7 @@ def test_API_functionError():
 
 def test_API_Post():
     """Should work as expected on POST request."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
     )
@@ -1131,7 +1346,7 @@ def test_API_Post():
 
 def test_API_ctx():
     """Should work as expected and pass ctx and evt to the function."""
-    app = proxy.API(name="test")
+    app = API(name="test")
 
     @app.route("/<id>", methods=["GET"], cors=True)
     @app.pass_event
@@ -1172,7 +1387,7 @@ def test_API_ctx():
 
 def test_API_multipleRoute():
     """Should work as expected."""
-    app = proxy.API(name="test")
+    app = API(name="test")
 
     @app.route("/<user>", methods=["GET"], cors=True)
     @app.route("/<user>@<int:num>", methods=["GET"], cors=True)
@@ -1224,9 +1439,9 @@ def test_API_multipleRoute():
         app.log.removeHandler(h)
 
 
-def test_API_doc():
+def test_API_doc(openapi_content):
     """Should work as expected."""
-    app = proxy.API(name="test")
+    app = API(name="test")
 
     @app.route("/test", methods=["POST"])
     def _post(body: str) -> Response:
@@ -1325,9 +1540,9 @@ def test_API_doc():
         app.log.removeHandler(h)
 
 
-def test_API_doc_apigw():
+def test_API_doc_apigw(openapi_apigw_content):
     """Should work as expected if request from api-gateway."""
-    app = proxy.API(name="test")
+    app = API(name="test")
 
     @app.route("/test", methods=["POST"])
     def _post(body: str) -> Response:
@@ -1411,9 +1626,9 @@ def test_API_doc_apigw():
         app.log.removeHandler(h)
 
 
-def test_API_docCustomDomain():
+def test_API_docCustomDomain(openapi_custom_content):
     """Should work as expected."""
-    app = proxy.API(name="test")
+    app = API(name="test")
 
     @app.route("/test", methods=["POST"])
     def _post(body: str) -> Response:
@@ -1482,7 +1697,7 @@ def test_API_docCustomDomain():
 
 def test_routeRegex():
     """Add and parse route."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct_one = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
     )
@@ -1548,7 +1763,7 @@ def test_routeRegex():
 
 def test_routeRegexFailing():
     """Add and parse route."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "yooooo")
     )
@@ -1692,7 +1907,7 @@ def testApigwPath():
 
 def testApigwHostUrl():
     """Test url property."""
-    app = proxy.API(name="test")
+    app = API(name="test")
     funct = Mock(
         __name__="Mock", return_value=Response(StatusCode.OK, "text/plain", "heyyyy")
     )
@@ -1786,7 +2001,7 @@ def testApigwHostUrl():
 
 def test_API_simpleRoute():
     """Should work as expected."""
-    app = proxy.API(name="test")
+    app = API(name="test")
 
     @app.post("/test")
     def _post(body: str) -> Response:
