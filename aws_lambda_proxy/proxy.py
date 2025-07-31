@@ -20,6 +20,19 @@ from aws_lambda_proxy import StatusCode
 from aws_lambda_proxy.templates import redoc, swagger
 from aws_lambda_proxy.types import Response
 
+BINARY_TYPES = [
+    "application/octet-stream",
+    "application/x-protobuf",
+    "application/x-tar",
+    "application/zip",
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/tiff",
+    "image/webp",
+    "image/jp2",
+]
+
 params_expr = re.compile(r"(<[^>]*>)")
 proxy_pattern = re.compile(r"/{(?P<name>.+)\+}$")
 param_pattern = re.compile(
@@ -567,34 +580,17 @@ class API:
 
         """
         accepted_methods = accepted_methods or []
-        binary_types = [
-            "application/octet-stream",
-            "application/x-protobuf",
-            "application/x-tar",
-            "application/zip",
-            "image/png",
-            "image/jpeg",
-            "image/jpg",
-            "image/tiff",
-            "image/webp",
-            "image/jp2",
-        ]
-
-        message_data: Dict[str, Any] = {
-            "statusCode": response.status_code.value,
-            "headers": {"Content-Type": response.content_type},
-        }
+        headers = response.headers or {}
+        headers["Content-Type"] = response.content_type
 
         if cors:
-            message_data["headers"]["Access-Control-Allow-Origin"] = "*"
-            message_data["headers"]["Access-Control-Allow-Methods"] = ",".join(
-                accepted_methods
-            )
-            message_data["headers"]["Access-Control-Allow-Credentials"] = "true"
+            headers["Access-Control-Allow-Origin"] = "*"
+            headers["Access-Control-Allow-Methods"] = ",".join(accepted_methods)
+            headers["Access-Control-Allow-Credentials"] = "true"
 
         response_body = response.body
         if compression and compression in accepted_compression:
-            message_data["headers"]["Content-Encoding"] = compression
+            headers["Content-Encoding"] = compression
             if isinstance(response_body, str):
                 response_body = bytes(response_body, "utf-8")
 
@@ -627,18 +623,22 @@ class API:
                 )
 
         if ttl:
-            message_data["headers"]["Cache-Control"] = (
+            headers["Cache-Control"] = (
                 f"max-age={ttl}"
                 if response.status_code == StatusCode.OK
                 else "no-cache"
             )
         elif cache_control:
-            message_data["headers"]["Cache-Control"] = (
+            headers["Cache-Control"] = (
                 cache_control if response.status_code == StatusCode.OK else "no-cache"
             )
 
+        message_data: Dict[str, Any] = {
+            "headers": headers,
+            "statusCode": response.status_code.value,
+        }
         if (
-            response.content_type in binary_types or not isinstance(response_body, str)
+            response.content_type in BINARY_TYPES or not isinstance(response_body, str)
         ) and b64encode:
             message_data["isBase64Encoded"] = True
             message_data["body"] = base64.b64encode(response_body).decode()  # type: ignore

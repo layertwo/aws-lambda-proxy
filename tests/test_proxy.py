@@ -457,6 +457,41 @@ def test_headersNull():
     funct.assert_called_with(user="remotepixel")
 
 
+def test_API_custom_headers():
+    """Add and parse route."""
+    app = proxy.API(name="test")
+    funct = Mock(
+        __name__="Mock",
+        return_value=Response(
+            status_code=StatusCode.OK,
+            content_type="text/plain",
+            body="heyyyy",
+            headers={"X-Custom-Header": "foobar"},
+        ),
+    )
+    app._add_route("/test/<user>", funct, methods=["GET"], cors=True)
+
+    event = {
+        "path": "/test/remotepixel",
+        "httpMethod": "GET",
+        "headers": None,
+        "queryStringParameters": {},
+    }
+    resp = {
+        "body": "heyyyy",
+        "headers": {
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET",
+            "Access-Control-Allow-Origin": "*",
+            "Content-Type": "text/plain",
+            "X-Custom-Header": "foobar",
+        },
+        "statusCode": 200,
+    }
+    res = app(event, {})
+    assert res == resp
+
+
 def test_API_encoding():
     """Test b64 encoding."""
     app = proxy.API(name="test")
