@@ -335,10 +335,10 @@ Issues and pull requests are more than welcome.
 
 ```bash
 $ git clone https://github.com/layertwo/aws-lambda-proxy.git
-$ cd lambda-proxy
-$ pip install -e .[dev]
+$ cd aws-lambda-proxy
+$ pip install -e .[test]
 ```
 
 ### License
 
-See [LICENSE.txt](/LICENSE.txt>).
+See [LICENSE.txt](LICENSE.txt).
