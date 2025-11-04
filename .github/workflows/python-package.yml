@@ -42,7 +42,7 @@ jobs:
         pytest --junitxml=junit/test-results-${{ matrix.python-version }}.xml
     - name: Archive test results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: pytest-results-${{ matrix.python-version }}
         path: junit/test-results-${{ matrix.python-version }}.xml
