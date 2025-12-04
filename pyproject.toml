@@ -31,7 +31,7 @@ test = [
     "black==25.11.0",
     "isort==6.1.0",
     "flake8==7.3.0",
-    "Flake8-pyproject==1.2.3",
+    "Flake8-pyproject==1.2.4",
 ]
 
 [tool.setuptools.package-data]
